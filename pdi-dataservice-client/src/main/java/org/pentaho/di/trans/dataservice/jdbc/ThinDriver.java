@@ -36,23 +36,45 @@ public class ThinDriver implements Driver {
   public static final String SERVICE_NAME = "/kettle";
   public static final String NAME = "PDI Data Services JDBC driver";
 
+  private static Driver registeredDriver;
+  
   protected static Logger logger = Logger.getLogger( NAME );
 
   static {
     new ThinDriver().register();
   }
 
-  public ThinDriver() {
-  }
-
   private void register() {
     try {
-      DriverManager.registerDriver( this );
+      if (isRegistered()) {
+        throw new IllegalStateException(
+            "Driver is already registered. It can only be registered once.");
+      }
+      final ThinDriver registeredDriver = new ThinDriver();
+      DriverManager.registerDriver(registeredDriver);
+      ThinDriver.registeredDriver = registeredDriver;
+      
     } catch ( SQLException e ) {
       logger.throwing( DriverManager.class.getName(), "registerDriver", e );
     }
   }
+  
+  public static void deregister() throws SQLException {
+    if (registeredDriver == null) {
+      throw new IllegalStateException(
+          "Driver is not registered (or it has not been registered using Driver.register() method)");
+    }
+    DriverManager.deregisterDriver(registeredDriver);
+    registeredDriver = null;
+  }
 
+  /**
+   * @return {@code true} if the driver is registered against {@link DriverManager}
+   */
+  public static boolean isRegistered() {
+    return registeredDriver != null;
+  }
+	  
   @Override
   public boolean acceptsURL( String url ) {
     return url.startsWith( BASE_URL );
@@ -60,6 +82,9 @@ public class ThinDriver implements Driver {
 
   @Override
   public Connection connect( String url, Properties properties ) throws SQLException {
+	if (url == null) {
+	  throw new SQLException("url is null");
+	}
     if ( acceptsURL( url ) ) {
       ThinConnection connection = createConnection( url, properties );
       if ( connection.isValid( 0 ) ) {
